@@ -237,22 +237,51 @@ class Tax:
         B[9:12] = int2hex(int(self.__lower_tax_limit * 100), 3)
         return bytes(B)
 
-def import_programming(directory: str):
-    products_file = directory + "/PROGRAM/PLUDT.SDA"
-    departments_file = directory + "/PROGRAM/DEPTDT.SDA"
-    taxes_file = directory + "/PROGRAM/TAXTB.SDA"
-    logo_msg_file = directory + "/PROGRAM/LOGODT.SDA"
-    return import_products(products_file), import_departments(departments_file), import_taxes(taxes_file), import_logo_msg(logo_msg_file)
+class Programming:
+    dept: list[Department]
+    plu: list[Product]
+    logo: Logo
+    logo_msg: Logo_msg
+    tax: list[Tax]
+    
+    def __init__(self, 
+        dept: list[Department],
+        plu: list[Product],
+        logo: Logo,
+        logo_msg: Logo_msg,
+        tax: list[Tax]):
+        assert isinstance(dept, list) and all(map(lambda x: isinstance(x, Department), dept))
+        self.dept = dept
+        assert isinstance(plu, list) and all(map(lambda x: isinstance(x, Product), plu))
+        self.plu = plu
+        assert isinstance(logo, Logo)
+        self.logo = logo
+        assert isinstance(logo_msg, Logo_msg)
+        self.logo_msg = logo_msg
+        assert isinstance(tax, list) and all(map(lambda x: isinstance(x, Tax), tax))
+        self.tax = tax
 
-def export_programming(directory: str, products: list[Product], departments: list[Department], taxes: list[Tax], logo_msg: Logo_msg):
-    products_file = directory + "/PROGRAM/PLUDT.SDA"
-    departments_file = directory + "/PROGRAM/DEPTDT.SDA"
-    taxes_file = directory + "/PROGRAM/TAXTB.SDA"
-    logo_msg_file = directory + "/PROGRAM/LOGODT.SDA"
-    return (export_products(products_file, products),
-            export_departments(departments_file, departments),
-            export_taxes(taxes_file, taxes),
-            export_logo_msg(logo_msg_file, logo_msg))
+    def read_directory(directory: str):
+        products_file = directory + "/PROGRAM/PLUDT.SDA"
+        departments_file = directory + "/PROGRAM/DEPTDT.SDA"
+        taxes_file = directory + "/PROGRAM/TAXTB.SDA"
+        logo_msg_file = directory + "/PROGRAM/LOGODT.SDA"
+        
+        dept = import_departments(departments_file)
+        plu = import_products(products_file)
+        #logo = import_logo(logo_file)
+        logo_msg = import_logo_msg(logo_msg_file)
+        tax = import_taxes(taxes_file)
+
+    def write_directory(self, directory: str):
+        products_file = directory + "/PROGRAM/PLUDT.SDA"
+        departments_file = directory + "/PROGRAM/DEPTDT.SDA"
+        taxes_file = directory + "/PROGRAM/TAXTB.SDA"
+        logo_msg_file = directory + "/PROGRAM/LOGODT.SDA"
+        return (export_products(products_file, self.products),
+                export_departments(departments_file, self.departments),
+                export_taxes(taxes_file, self.taxes),
+                export_logo_msg(logo_msg_file, self.logo_msg))
 
 def import_products(file: str):
     products = []
