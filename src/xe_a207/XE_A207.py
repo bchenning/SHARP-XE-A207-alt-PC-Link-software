@@ -22,6 +22,19 @@ class Department:
                  price: float,
                  text: str,
                 ):
+        """initializes new Department object
+
+        Args:
+            code (int):         Number/Code of the Department
+            sales_type (bool):  Normal sales type (True), SICS (False)
+            open (bool):        price can be changed (True) or not (False)
+            preset (bool):      is preset default price (True) or not (False)
+            taxable (Taxable):  valid Taxable
+            halo (float):       highest allowed price
+            group_no (int):     group number (1-9 => plus department, 10 => minus department, 11 => plus extra department, 12 => minus extra department)
+            price (float):      default price of the department
+            text (str):         department name
+        """
         assert isinstance(code, int) and code < 100
         self.__code = code
         assert isinstance(sales_type, bool)
@@ -34,16 +47,45 @@ class Department:
         self.__taxable = taxable
         assert isinstance(halo, float) and 0. <= halo <= 999999.99
         self.__halo = halo
-        assert isinstance(group_no, int) and group_no <= 12
+        assert isinstance(group_no, int) and 0 <= group_no <= 12
         self.__group_no = group_no
-        assert isinstance(price, float) and 0. <= price < 1e9
+        assert isinstance(price, float) and 0. <= price <= 999999.99
         self.__price = price
         assert isinstance(text, str) and len(text) <= 16
         self.__text = text
 
     def from_bytes(B: bytes):
+        """creates a new department object from bytes
+        Format:
+            B[0] - code
+            B[1] - infos for single item cash sales, preset price and open price
+                    b'000S00PO'
+                    S is 1 if single item cash sales, P is 1 if preset default price is used, O is 1 if price is open for change
+            B[2] - VATs that should be applied
+                    b'0000ABCD'
+                    A is 1 if VAT1, B is 1 if VAT2, C is 1 if VAT3 and D is 1 if VAT4 applies (multiple VATs are possible to apply)
+            B[3:7] - halo (highest amount lockout) aka highest price that can be used with this department
+                    hex format (but only decimal numbers are used!)
+            B[7] - Group number
+                    1-9 Plus department
+                    10 Minus department
+                    11 Plus extra department
+                    12 Minus extra department
+                    hex format (but only decimal numbers are used!)
+            B[8:12] - default price for this department (only used if preset is set)
+                    hex format (but only decimal numbers are used!)
+            B[12:28] - department name decoded with DOS Latin US (Code page 437)
+            all other Bytes/Bits are zeros
+
+        Args:
+            B (bytes): bytes of a single department
+        Returns:
+            Department: a new Department object with the data from the given bytes
+        """
+        assert len(B) == 28
         preset_open_sale_type = int(B[1])
         _code = int(B[0:1].hex())
+        assert (preset_open_sale_type & (~0b10011)) == 0
         _sales_type = (preset_open_sale_type & 0b10000) != 0
         _open       = (preset_open_sale_type & 0b00001) != 0
         _preset     = (preset_open_sale_type & 0b00010) != 0
@@ -55,6 +97,30 @@ class Department:
         return Department(_code, _sales_type, _open, _preset, _taxable, _halo, _group_no, _price, _text)
 
     def to_bytes(self) -> bytes:
+        """Converts the department into bytes of the format:
+            B[0] - code
+            B[1] - infos for single item cash sales, preset price and open price
+                    b'000S00PO'
+                    S is 1 if single item cash sales, P is 1 if preset default price is used, O is 1 if price is open for change
+            B[2] - VATs that should be applied
+                    b'0000DCBA'
+                    A is 1 if VAT1, B is 1 if VAT2, C is 1 if VAT3 and D is 1 if VAT4 applies (multiple VATs are possible to apply)
+            B[3:7] - halo (highest amount lockout) aka highest price that can be used with this department
+                    hex format (but only decimal numbers are used!)
+            B[7] - Group number
+                    1-9 Plus department
+                    10 Minus department
+                    11 Plus extra department
+                    12 Minus extra department
+                    hex format (but only decimal numbers are used!)
+            B[8:12] - default price for this department (only used if preset is set)
+                    hex format (but only decimal numbers are used!)
+            B[12:28] - department name decoded with DOS Lating US (Code page 437)
+            all other Bytes/Bits are zeros
+
+        Returns:
+            bytes: Bytes that can be read by the cash register
+        """
         B = bytearray([0] * 28)
         B[0:1] = int2hex(self.__code, 1)
         if self.__sales_type:
@@ -75,6 +141,32 @@ class Department:
         
     def __str__(self):
         return f"{self.__code}\t{self.__sales_type}\t{self.__open}\t{self.__preset}\t{self.__taxable}\t{self.__halo}\t{self.__group_no}\t{self.__price}\t{self.__text}"
+    
+    def __eq__(self, other):
+        return (
+            self.__code == other.__code and
+            self.__open == other.__open and
+            self.__preset == other.__preset and
+            self.__sales_type == other.__sales_type and
+            self.__group_no == other.__group_no and
+            int(self.__price * 100.) == int(other.__price * 100.) and
+            int(self.__halo * 100.) == int(other.__halo * 100.) and
+            self.__text == other.__text)
+
+    def __ne__(self, other):
+        return (
+            self.__code != other.__code or
+            self.__open != other.__open or
+            self.__preset != other.__preset or
+            self.__sales_type != other.__sales_type or
+            self.__group_no != other.__group_no or
+            int(self.__price * 100.) != int(other.__price * 100.) or
+            int(self.__halo * 100.) != int(other.__halo * 100.) or
+            self.__text != other.__text
+        )
+
+    def __hash__(self):
+        return int(self.to_bytes().hex(), 16)
 
 class Product:
     __code: int
@@ -132,6 +224,27 @@ class Product:
     def __str__(self):
         return f"{self.__code}\t{self.__dept_no}\t{self.__open}\t{self.__preset}\t{self.__price}\t{self.__text}"
 
+    def __eq__(self, other):
+        return (
+            self.__code == other.__code and
+            self.__dept_no == other.__dept_no and
+            self.__open == other.__open and
+            self.__preset == other.__preset and
+            int(self.__price * 100.) == int(other.__price * 100.) and
+            self.__text == other.__text)
+
+    def __ne__(self, other):
+        return (
+            self.__code != other.__code or
+            self.__dept_no != other.__dept_no or
+            self.__open != other.__open or
+            self.__preset != other.__preset or
+            int(self.__price * 100.) != int(other.__price * 100.) or
+            self.__text != other.__text)
+
+    def __hash__(self):
+        return int(self.to_bytes().hex(), 16)
+
 class Taxable:
     __tax_1: bool
     __tax_2: bool
@@ -148,6 +261,8 @@ class Taxable:
         self.__tax_4 = tax_4
 
     def from_byte(byte: int):
+        assert isinstance(byte, int)
+        assert 0 <= byte < 16
         tax_1 = byte & 0b0001 != 0
         tax_2 = byte & 0b0010 != 0
         tax_3 = byte & 0b0100 != 0
@@ -165,6 +280,27 @@ class Taxable:
     def __repr__(self):
         return f"Taxable (tax_1 = {self.__tax_1}, tax_2 = {self.__tax_2}, tax_3 = {self.__tax_3}, tax_4 = {self.__tax_4})"
 
+    def __eq__(self, other):
+        if (isinstance(other, self.__class__) and
+            self.__tax_1 == other.__tax_1 and
+            self.__tax_2 == other.__tax_2 and
+            self.__tax_3 == other.__tax_3 and
+            self.__tax_4 == other.__tax_4):
+            return True
+        return False
+    
+    def __ne__(self, other):
+        if (not isinstance(other, self.__class__) or
+            self.__tax_1 != other.__tax_1 or
+            self.__tax_2 != other.__tax_2 or
+            self.__tax_3 != other.__tax_3 or
+            self.__tax_4 != other.__tax_4):
+            return True
+        return False
+    
+    def __hash__(self):
+        return self.to_byte()
+
 # TODO
 class Logo:
     pass
@@ -174,9 +310,12 @@ class Logo_msg:
     
     def __init__(self, rows: list[str]):
         self.__rows = []
+        assert isinstance(rows, list)
         assert len(rows) <= 6
         for row in rows:
+            assert isinstance(row, str)
             assert len(row) <= 30
+            assert "\n" not in row
             self.__rows.append(row)
 
     def from_bytes(B: bytes):
