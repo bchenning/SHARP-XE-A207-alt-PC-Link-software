@@ -21,3 +21,8 @@ Issues = "https://github.com/bchenning/SHARP-XE-A207-alt-PC-Link-software/issues
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "src"
+]
