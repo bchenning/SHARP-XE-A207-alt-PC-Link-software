@@ -47,4 +47,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: release-dists-${{ matrix.python-version }}
-        path: dist/
+        path: |
+          dist/xe_a207-**.whl
+          dist/xe_a207-**.tar.gz
